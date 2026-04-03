@@ -257,6 +257,42 @@ In our SECS audit (285 references, 11 papers):
 - Open Library mainly covers books, not journal articles
 - The tool cannot verify the *content* of a citation — only that the cited work exists
 
+## How This Project Works: AI + Human
+
+This entire project — extraction, discovery, validation, classification, the CLI, the tests, the dashboard — was built and managed using AI coding tools. The pipeline runs autonomously end to end.
+
+**But citation-sentinel does not replace the human.**
+
+The machine does the exhaustive, tedious work: parsing every reference, querying every API, resolving every DOI, scoring every match. It catches the obvious fabrications and flags the ambiguous ones. What it cannot do is make the final judgement call on a reference that sits at the boundary.
+
+The model is closer to **Wikipedia for independent research citations**:
+
+1. **The machine builds the first draft** — automated extraction, lookup, verification
+2. **The human reviews the output** — confirms verdicts, investigates edge cases, corrects false positives
+3. **The verified result becomes the record** — once a human signs off, that citation is confirmed
+4. **Over time, the machine learns from corrections** — human verdicts feed back into better matching
+
+The goal is not AI replacing peer review. The goal is AI doing the 95% of citation verification that is mechanical, so the human can focus on the 5% that requires judgement.
+
+**Every `sentinel audit` output should be reviewed by a human before being treated as authoritative.**
+
+## Contributing: Collaborators, Not Forks
+
+This is an open-source project that gets better through collaboration, not fragmentation.
+
+**We want collaborators who contribute back**, not people who fork and disappear. The value of citation-sentinel scales with the community: more contributors means better extraction patterns, wider API coverage, stronger verification, and eventually a shared registry of verified citations.
+
+### How to contribute
+
+- **Fix a bug or improve accuracy?** Open a PR. We merge fast.
+- **Found a reference format we don't handle?** Open an issue with a sample.
+- **Built an integration?** (CI/CD, pre-commit hook, journal plugin) — share it.
+- **Want to build the community registry?** Open an issue. We'll help design it.
+
+Everyone who contributes improves the tool for every other user. Pull requests and issues are the mechanism. The MIT license means you *can* fork, but the benefit of contributing back is that everyone's sentinel gets better, not just yours.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
@@ -266,3 +302,5 @@ MIT — see [LICENSE](LICENSE).
 Built by Jay Carpenter as part of the [SECS project](https://secs.observer).
 
 The verification methodology was developed and proven on 285 real-world academic citations across thermodynamics, mathematics, and engineering.
+
+The "SECS Sentinel Verified" badge on [secs.observer/citation-audit.html](https://secs.observer/citation-audit.html) refers to the internal audit pipeline that preceded this open-source tool. The methodology is identical.

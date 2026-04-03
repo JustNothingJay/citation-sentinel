@@ -2,6 +2,8 @@
 
 Thanks for your interest in improving citation verification for independent research.
 
+**We want collaborators, not forks.** The value of this tool scales with the community — every improvement you contribute makes sentinel better for every other user. Fork if you must, but contributing back through PRs and issues is how the ecosystem grows.
+
 ## Setup
 
 ```bash
