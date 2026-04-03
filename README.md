@@ -166,13 +166,13 @@ This would let any researcher answer: *"Has anyone else verified this citation?"
 
 ### How To Build This
 
-We designed sentinel so the registry can be built by anyone:
+I designed sentinel so the registry can be built by anyone:
 
 1. **Federated GitHub option** — Each researcher publishes their inventory JSON to a public repo; a GitHub Action aggregates them.
 2. **Lightweight API option** — A serverless function (Cloudflare Workers, Vercel) accepting inventory uploads and serving cross-reference queries.
 3. **Full database option** — PostgreSQL/SQLite backend with a web UI for browsing verified citations.
 
-**We can't fund the database**, but the data format is stable and the `sentinel publish` command is designed to output registry-ready JSON. If you want to build this, open an issue.
+The data format is stable and the `sentinel publish` command is designed to output registry-ready JSON. If you want to build this, open an issue.
 
 ### Contributing to the Registry
 
@@ -243,7 +243,7 @@ The `citation_inventory.json` is a structured file with:
 
 ## Accuracy
 
-In our SECS audit (285 references, 11 papers):
+In the SECS audit (285 references, 11 papers):
 - **208/285** DOIs discovered via CrossRef (73%)
 - **215/215** DOIs validated via doi.org (100% — after paywall classification)
 - **38/50** no-DOI references deep-verified as VERIFIED or LIKELY_REAL (76%)
@@ -280,14 +280,14 @@ The goal is not AI replacing peer review. The goal is AI doing the 95% of citati
 
 This is an open-source project that gets better through collaboration, not fragmentation.
 
-**We want collaborators who contribute back**, not people who fork and disappear. The value of citation-sentinel scales with the community: more contributors means better extraction patterns, wider API coverage, stronger verification, and eventually a shared registry of verified citations.
+**I want collaborators who contribute back**, not people who fork and disappear. The value of citation-sentinel scales with the community: more contributors means better extraction patterns, wider API coverage, stronger verification, and eventually a shared registry of verified citations.
 
 ### How to contribute
 
-- **Fix a bug or improve accuracy?** Open a PR. We merge fast.
-- **Found a reference format we don't handle?** Open an issue with a sample.
+- **Fix a bug or improve accuracy?** Open a PR. I merge fast.
+- **Found a reference format that isn't handled?** Open an issue with a sample.
 - **Built an integration?** (CI/CD, pre-commit hook, journal plugin) — share it.
-- **Want to build the community registry?** Open an issue. We'll help design it.
+- **Want to build the community registry?** Open an issue. I'll help design it.
 
 Everyone who contributes improves the tool for every other user. Pull requests and issues are the mechanism. The MIT license means you *can* fork, but the benefit of contributing back is that everyone's sentinel gets better, not just yours.
 

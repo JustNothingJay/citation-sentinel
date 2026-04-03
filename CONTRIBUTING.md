@@ -2,7 +2,7 @@
 
 Thanks for your interest in improving citation verification for independent research.
 
-**We want collaborators, not forks.** The value of this tool scales with the community — every improvement you contribute makes sentinel better for every other user. Fork if you must, but contributing back through PRs and issues is how the ecosystem grows.
+**I want collaborators, not forks.** The value of this tool scales with the community — every improvement you contribute makes sentinel better for every other user. Fork if you must, but contributing back through PRs and issues is how the ecosystem grows.
 
 ## Setup
 
@@ -25,14 +25,14 @@ All tests must pass before submitting a PR.
 
 ## Code Style
 
-We use [ruff](https://docs.astral.sh/ruff/) for linting:
+This project uses [ruff](https://docs.astral.sh/ruff/) for linting:
 
 ```bash
 ruff check .
 ruff format .
 ```
 
-## What We Need Help With
+## What I Need Help With
 
 ### Extraction Accuracy
 - Better parsing of unusual reference formats (e.g., footnote-style, endnote exports)
@@ -45,12 +45,12 @@ ruff format .
 - Conference proceedings discovery (ACM DL, IEEE Xplore metadata)
 
 ### Community Registry
-This is the big one. We need someone to build a shared verification database where researchers can upload and cross-reference their audit results. See the README for architecture concepts. Options:
+This is the big one. A shared verification database where researchers can upload and cross-reference their audit results. See the README for architecture concepts. Options:
 - Federated GitHub-based aggregation
 - Lightweight serverless API
 - Full database with web UI
 
-We can't fund the hosting, but the data format is stable and the tool is designed to produce registry-ready output.
+The data format is stable and the tool is designed to produce registry-ready output. If you want to take this on, open an issue.
 
 ### Documentation
 - Tutorials for specific disciplines (humanities, STEM, social science)
