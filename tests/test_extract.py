@@ -1,4 +1,4 @@
-"""Tests for reference extraction from Markdown, BibTeX, and LaTeX."""
+"""Tests for reference extraction from Markdown, BibTeX, LaTeX, RIS, EndNote XML, and CSL-JSON."""
 
 from pathlib import Path
 
@@ -9,6 +9,9 @@ from sentinel.extract import (
     extract_file,
     extract_markdown,
     extract_bibtex,
+    extract_ris,
+    extract_endnote_xml,
+    extract_csl_json,
     canonical_key,
     first_author_surname,
 )
@@ -141,3 +144,166 @@ class TestFirstAuthorSurname:
     def test_empty(self):
         assert first_author_surname("") == ""
         assert first_author_surname(None) == ""
+
+
+class TestFootnoteExtraction:
+    """Tests for Markdown footnote-style reference parsing."""
+
+    def test_footnote_references(self, tmp_path):
+        text = """# My Paper
+
+Some text with a citation[^1] and another[^2].
+
+## References
+
+[^1]: Einstein, A. (1905). On the Electrodynamics of Moving Bodies. *Annalen der Physik*. DOI: 10.1002/andp.19053220607
+[^2]: Shannon, C. E. (1948). A Mathematical Theory of Communication. *Bell System Technical Journal*.
+"""
+        p = tmp_path / "footnotes.md"
+        p.write_text(text, encoding="utf-8")
+        refs = extract_markdown(p)
+        assert len(refs) >= 2
+        assert any("Einstein" in (r.authors or r.raw) for r in refs)
+        assert any("Shannon" in (r.authors or r.raw) for r in refs)
+
+    def test_footnote_outside_ref_section(self, tmp_path):
+        text = """# My Paper
+
+Some body text.
+
+[^1]: Feynman, R. P. (1985). QED: The Strange Theory of Light and Matter.
+"""
+        p = tmp_path / "footnotes_only.md"
+        p.write_text(text, encoding="utf-8")
+        refs = extract_markdown(p)
+        assert len(refs) >= 1
+        assert any("Feynman" in (r.authors or r.raw) for r in refs)
+
+
+class TestRISExtraction:
+    """Tests for RIS format parsing."""
+
+    def test_extract_ris_file(self):
+        refs = extract_ris(FIXTURES / "sample_refs.ris")
+        assert len(refs) == 2
+
+    def test_ris_authors(self):
+        refs = extract_ris(FIXTURES / "sample_refs.ris")
+        shannon = next(r for r in refs if "Shannon" in (r.authors or ""))
+        assert "Weaver" in shannon.authors
+
+    def test_ris_doi(self):
+        refs = extract_ris(FIXTURES / "sample_refs.ris")
+        shannon = next(r for r in refs if "Shannon" in (r.authors or ""))
+        assert shannon.doi == "10.1002/j.1538-7305.1948.tb01338.x"
+
+    def test_ris_year(self):
+        refs = extract_ris(FIXTURES / "sample_refs.ris")
+        feynman = next(r for r in refs if "Feynman" in (r.authors or ""))
+        assert feynman.year == "1985"
+
+    def test_ris_url(self):
+        refs = extract_ris(FIXTURES / "sample_refs.ris")
+        feynman = next(r for r in refs if "Feynman" in (r.authors or ""))
+        assert feynman.url is not None
+
+    def test_ris_via_extract_file(self):
+        refs = extract_file(FIXTURES / "sample_refs.ris")
+        assert len(refs) == 2
+
+
+class TestEndNoteXMLExtraction:
+    """Tests for EndNote XML format parsing."""
+
+    def test_extract_endnote_xml(self):
+        refs = extract_endnote_xml(FIXTURES / "sample_refs.xml")
+        assert len(refs) == 2
+
+    def test_endnote_authors(self):
+        refs = extract_endnote_xml(FIXTURES / "sample_refs.xml")
+        einstein = next(r for r in refs if "Einstein" in (r.authors or ""))
+        assert "Albert" in einstein.authors
+
+    def test_endnote_doi(self):
+        refs = extract_endnote_xml(FIXTURES / "sample_refs.xml")
+        einstein = next(r for r in refs if "Einstein" in (r.authors or ""))
+        assert einstein.doi == "10.1002/andp.19053220607"
+
+    def test_endnote_year(self):
+        refs = extract_endnote_xml(FIXTURES / "sample_refs.xml")
+        turing = next(r for r in refs if "Turing" in (r.authors or ""))
+        assert turing.year == "1936"
+
+    def test_endnote_journal(self):
+        refs = extract_endnote_xml(FIXTURES / "sample_refs.xml")
+        einstein = next(r for r in refs if "Einstein" in (r.authors or ""))
+        assert "Annalen" in (einstein.journal or "")
+
+    def test_endnote_via_extract_file(self):
+        refs = extract_file(FIXTURES / "sample_refs.xml")
+        assert len(refs) == 2
+
+
+class TestCSLJSONExtraction:
+    """Tests for CSL-JSON format parsing."""
+
+    def test_extract_csl_json(self):
+        refs = extract_csl_json(FIXTURES / "sample_refs.json")
+        assert len(refs) == 2
+
+    def test_csl_authors(self):
+        refs = extract_csl_json(FIXTURES / "sample_refs.json")
+        einstein = next(r for r in refs if r.key == "einstein1905")
+        assert "Einstein" in (einstein.authors or "")
+
+    def test_csl_doi(self):
+        refs = extract_csl_json(FIXTURES / "sample_refs.json")
+        shannon = next(r for r in refs if r.key == "shannon1948")
+        assert shannon.doi == "10.1002/j.1538-7305.1948.tb01338.x"
+
+    def test_csl_year(self):
+        refs = extract_csl_json(FIXTURES / "sample_refs.json")
+        einstein = next(r for r in refs if r.key == "einstein1905")
+        assert einstein.year == "1905"
+
+    def test_csl_journal(self):
+        refs = extract_csl_json(FIXTURES / "sample_refs.json")
+        shannon = next(r for r in refs if r.key == "shannon1948")
+        assert "Bell System" in (shannon.journal or "")
+
+    def test_csl_via_extract_file(self):
+        refs = extract_file(FIXTURES / "sample_refs.json")
+        assert len(refs) == 2
+
+
+class TestBibTeXEdgeCases:
+    """Tests for BibTeX nested braces and string concatenation."""
+
+    def test_nested_braces_in_title(self, tmp_path):
+        bib = r"""@article{test2024,
+  author = {Smith, John},
+  title  = {The {Schr{\"o}dinger} Equation in {3D}},
+  year   = {2024},
+  journal = {Physical Review}
+}"""
+        p = tmp_path / "nested.bib"
+        p.write_text(bib, encoding="utf-8")
+        refs = extract_bibtex(p)
+        assert len(refs) == 1
+        assert "dinger" in (refs[0].title or "")
+        assert "3D" in (refs[0].title or "")
+
+    def test_string_concatenation(self, tmp_path):
+        bib = """@string{jnl_bell = "Bell System Technical Journal"}
+
+@article{shannon1948,
+  author  = {Shannon, Claude E.},
+  title   = {A Mathematical Theory of Communication},
+  year    = {1948},
+  journal = jnl_bell
+}"""
+        p = tmp_path / "concat.bib"
+        p.write_text(bib, encoding="utf-8")
+        refs = extract_bibtex(p)
+        assert len(refs) == 1
+        assert "Bell" in (refs[0].journal or "")

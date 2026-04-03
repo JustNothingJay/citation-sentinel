@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml><records>
+  <record>
+    <contributors><authors>
+      <author>Einstein, Albert</author>
+    </authors></contributors>
+    <titles><title>On the Electrodynamics of Moving Bodies</title></titles>
+    <dates><year>1905</year></dates>
+    <periodical><full-title>Annalen der Physik</full-title></periodical>
+    <electronic-resource-num>10.1002/andp.19053220607</electronic-resource-num>
+  </record>
+  <record>
+    <contributors><authors>
+      <author>Turing, Alan M.</author>
+    </authors></contributors>
+    <titles><title>On Computable Numbers, with an Application to the Entscheidungsproblem</title></titles>
+    <dates><year>1936</year></dates>
+    <periodical><full-title>Proceedings of the London Mathematical Society</full-title></periodical>
+  </record>
+</records></xml>

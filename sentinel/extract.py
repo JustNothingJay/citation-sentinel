@@ -1,10 +1,13 @@
 """
-Reference extraction from Markdown, LaTeX, and BibTeX files.
+Reference extraction from Markdown, LaTeX, BibTeX, RIS, EndNote XML,
+and CSL-JSON files.
 """
 
 from __future__ import annotations
 
+import json
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -51,7 +54,8 @@ _BIB_ENTRY = re.compile(
     r"@(\w+)\s*\{\s*([^,]*),\s*((?:[^@](?!@\w+\s*\{))*)",
     re.DOTALL,
 )
-_BIB_FIELD = re.compile(r"(\w+)\s*=\s*[{\"]((?:[^{}]|\{[^}]*\})*)[}\"]")
+# Matches: field = {value}, field = "value", and field = bareword
+_BIB_FIELD = re.compile(r"(\w+)\s*=\s*(?:[{\"]((?:[^{}]|\{(?:[^{}]|\{[^}]*\})*\})*)[}\"]|(\w+))")
 
 # LaTeX \bibliography / \addbibresource
 _LATEX_BIBFILE = re.compile(r"\\(?:bibliography|addbibresource)\{([^}]+)\}")
@@ -132,6 +136,14 @@ def _split_md_entries(ref_text: str) -> list[str]:
             if cells:
                 entries.append(" ".join(cells))
                 current = []
+            continue
+
+        # Footnote-style reference: [^1]: Author (Year). Title...
+        fn_match = re.match(r"^\[\^(\w+)\]:\s*(.*)", stripped)
+        if fn_match:
+            if current:
+                entries.append(" ".join(current))
+            current = [fn_match.group(2)]
             continue
 
         # Bullet or numbered entry
@@ -218,16 +230,35 @@ def _parse_md_entry(raw: str) -> Reference:
 def extract_markdown(path: Path) -> list[Reference]:
     """Extract all references from a Markdown file."""
     text = path.read_text(encoding="utf-8", errors="replace")
+    refs: list[Reference] = []
+
+    # Standard references section
     section = _extract_ref_section(text)
-    if not section:
-        return []
-    raw_entries = _split_md_entries(section)
-    refs = []
-    for raw in raw_entries:
-        ref = _parse_md_entry(raw)
+    if section:
+        raw_entries = _split_md_entries(section)
+        for raw in raw_entries:
+            ref = _parse_md_entry(raw)
+            ref.source_file = str(path)
+            ref.source_paper = path.stem
+            refs.append(ref)
+
+    # Footnote-style references outside a heading section: [^key]: ...
+    seen_raws = {r.raw for r in refs}
+    footnote_re = re.compile(r"^\[\^(\w+)\]:\s*(.+)", re.MULTILINE)
+    for fm in footnote_re.finditer(text):
+        body = fm.group(2).strip()
+        if len(body) < 20 or body in seen_raws:
+            continue
+        # Only treat as citation if it looks like one (has a year or DOI)
+        if not _YEAR_PAREN.search(body) and not _DOI.search(body):
+            continue
+        ref = _parse_md_entry(body)
         ref.source_file = str(path)
         ref.source_paper = path.stem
-        refs.append(ref)
+        if ref.raw not in seen_raws:
+            refs.append(ref)
+            seen_raws.add(ref.raw)
+
     return refs
 
 
@@ -237,6 +268,22 @@ def extract_bibtex(path: Path) -> list[Reference]:
     """Extract references from a .bib file."""
     text = path.read_text(encoding="utf-8", errors="replace")
     refs = []
+
+    # Collect @string definitions for concatenation support
+    _string_defs: dict[str, str] = {}
+    for sm in re.finditer(r"@[Ss][Tt][Rr][Ii][Nn][Gg]\s*\{\s*(\w+)\s*=\s*[{\"](.*?)[}\"]\s*\}", text):
+        _string_defs[sm.group(1).lower()] = sm.group(2)
+
+    # Strip @string/@comment/@preamble blocks so _BIB_ENTRY doesn't consume them
+    text = re.sub(r"@(?:string|comment|preamble)\s*\{[^}]*\}", "", text, flags=re.IGNORECASE)
+
+    def _resolve_field(raw_val: str) -> str:
+        """Resolve BibTeX string concatenation (e.g., jnl_phys # " Reviews")."""
+        parts = [p.strip().strip('"').strip("{}") for p in raw_val.split("#")]
+        resolved = []
+        for p in parts:
+            resolved.append(_string_defs.get(p.lower(), p))
+        return " ".join(resolved).strip()
 
     for match in _BIB_ENTRY.finditer(text):
         entry_type = match.group(1).lower()
@@ -248,11 +295,13 @@ def extract_bibtex(path: Path) -> list[Reference]:
 
         fields: dict[str, str] = {}
         for fm in _BIB_FIELD.finditer(body):
-            fields[fm.group(1).lower()] = fm.group(2).strip()
+            # group(2) is brace/quote value, group(3) is bare identifier
+            val = fm.group(2) if fm.group(2) is not None else (fm.group(3) or "")
+            fields[fm.group(1).lower()] = _resolve_field(val.strip())
 
         authors = fields.get("author")
         year = fields.get("year")
-        title = fields.get("title", "").strip("{}")
+        title = re.sub(r"[{}]", "", fields.get("title", "")).strip()
         journal = fields.get("journal") or fields.get("booktitle")
         doi = fields.get("doi")
         url = fields.get("url")
@@ -321,6 +370,190 @@ def extract_latex(path: Path) -> list[Reference]:
     return refs
 
 
+# ── RIS extraction ────────────────────────────────────────────────────
+
+_RIS_TAG = re.compile(r"^([A-Z][A-Z0-9])\s{2}-\s?(.*)", re.MULTILINE)
+
+
+def extract_ris(path: Path) -> list[Reference]:
+    """Extract references from a RIS (.ris) file."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    refs: list[Reference] = []
+    records: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+
+    for m in _RIS_TAG.finditer(text):
+        tag, value = m.group(1), m.group(2).strip()
+        if tag == "TY":
+            current = [("TY", value)]
+        elif tag == "ER":
+            if current:
+                records.append(current)
+                current = []
+        elif current is not None:
+            current.append((tag, value))
+
+    for record in records:
+        fields: dict[str, list[str]] = {}
+        for tag, val in record:
+            fields.setdefault(tag, []).append(val)
+
+        authors_list = fields.get("AU", fields.get("A1", []))
+        authors = " and ".join(authors_list) if authors_list else None
+        year_raw = (fields.get("PY") or fields.get("Y1") or fields.get("DA") or [""])[0]
+        year = year_raw[:4] if len(year_raw) >= 4 and year_raw[:4].isdigit() else None
+        title = (fields.get("TI") or fields.get("T1") or [""])[0] or None
+        journal = (fields.get("JO") or fields.get("JF") or fields.get("T2") or [""])[0] or None
+        doi = (fields.get("DO") or [""])[0] or None
+        url = (fields.get("UR") or [""])[0] or None
+
+        raw = f"{authors or '?'} ({year or '?'}). {title or '?'}."
+        if journal:
+            raw += f" {journal}."
+
+        ref = Reference(
+            raw=raw,
+            authors=authors,
+            year=year,
+            title=title if title and len(title) > 5 else None,
+            journal=journal,
+            doi=doi,
+            url=url,
+            source_file=str(path),
+        )
+        refs.append(ref)
+
+    return refs
+
+
+# ── EndNote XML extraction ────────────────────────────────────────────
+
+def extract_endnote_xml(path: Path) -> list[Reference]:
+    """Extract references from an EndNote XML export file."""
+    refs: list[Reference] = []
+    try:
+        tree = ET.parse(path)  # noqa: S314 — trusted local files only
+    except ET.ParseError:
+        return refs
+
+    root = tree.getroot()
+
+    # EndNote XML uses <records><record>...</record></records>
+    for record in root.iter("record"):
+        authors_el = record.find(".//contributors/authors")
+        authors = None
+        if authors_el is not None:
+            names = [a.text for a in authors_el.findall("author") if a.text]
+            if names:
+                authors = " and ".join(names)
+
+        year_el = record.find(".//dates/year")
+        year = year_el.text.strip() if year_el is not None and year_el.text else None
+
+        title_el = record.find(".//titles/title")
+        title = None
+        if title_el is not None:
+            # Title may contain <style> sub-elements
+            title = "".join(title_el.itertext()).strip()
+
+        journal_el = record.find(".//periodical/full-title")
+        if journal_el is None:
+            journal_el = record.find(".//secondary-title")
+        journal = None
+        if journal_el is not None:
+            journal = "".join(journal_el.itertext()).strip() or None
+
+        doi = None
+        doi_el = record.find(".//electronic-resource-num")
+        if doi_el is not None and doi_el.text:
+            doi = doi_el.text.strip()
+
+        url = None
+        url_el = record.find(".//urls/related-urls/url")
+        if url_el is not None and url_el.text:
+            url = url_el.text.strip()
+
+        raw = f"{authors or '?'} ({year or '?'}). {title or '?'}."
+        if journal:
+            raw += f" {journal}."
+
+        ref = Reference(
+            raw=raw,
+            authors=authors,
+            year=year,
+            title=title if title and len(title) > 5 else None,
+            journal=journal,
+            doi=doi,
+            url=url,
+            source_file=str(path),
+        )
+        refs.append(ref)
+
+    return refs
+
+
+# ── CSL-JSON extraction ──────────────────────────────────────────────
+
+def extract_csl_json(path: Path) -> list[Reference]:
+    """Extract references from a CSL-JSON file (.json)."""
+    refs: list[Reference] = []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, ValueError):
+        return refs
+
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return refs
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+
+        # Authors
+        author_parts = item.get("author", [])
+        names = []
+        for a in author_parts:
+            if isinstance(a, dict):
+                family = a.get("family", "")
+                given = a.get("given", "")
+                if family:
+                    names.append(f"{family}, {given}".strip(", "))
+        authors = " and ".join(names) if names else None
+
+        # Year — CSL date-parts is [[year, month, day]]
+        year = None
+        issued = item.get("issued", {})
+        date_parts = issued.get("date-parts", [[]])
+        if date_parts and date_parts[0]:
+            year = str(date_parts[0][0])
+
+        title = item.get("title")
+        journal = item.get("container-title") or item.get("collection-title")
+        doi = item.get("DOI")
+        url = item.get("URL")
+
+        raw = f"{authors or '?'} ({year or '?'}). {title or '?'}."
+        if journal:
+            raw += f" {journal}."
+
+        ref = Reference(
+            raw=raw,
+            authors=authors,
+            year=year,
+            title=title if title and len(title) > 5 else None,
+            journal=journal,
+            doi=doi,
+            url=url,
+            source_file=str(path),
+            key=item.get("id", canonical_key(authors, year)),
+        )
+        refs.append(ref)
+
+    return refs
+
+
 # ── Unified extraction ────────────────────────────────────────────────
 
 # Common paper filename patterns
@@ -331,6 +564,9 @@ PAPER_GLOBS = [
     "*.md",
     "*.tex",
     "*.bib",
+    "*.ris",
+    "*.xml",
+    "*.json",
 ]
 
 
@@ -345,11 +581,42 @@ def find_papers(root: Path, globs: list[str] | None = None) -> list[Path]:
             if p in seen:
                 continue
             # Skip common non-paper files
-            if p.name.lower() in ("readme.md", "changelog.md", "contributing.md", "license.md"):
+            if p.name.lower() in ("readme.md", "changelog.md", "contributing.md",
+                                   "license.md", "launch.md", "package.json",
+                                   "tsconfig.json"):
                 continue
             seen.add(p)
             papers.append(p)
     return papers
+
+
+def _is_csl_json(path: Path) -> bool:
+    """Heuristic: check if a .json file looks like CSL-JSON."""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")[:2000]
+        data = json.loads(text if text.rstrip().endswith("]") or text.rstrip().endswith("}") else text + "]")
+    except (json.JSONDecodeError, ValueError):
+        # Try parsing just the start
+        try:
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except (json.JSONDecodeError, ValueError):
+            return False
+    if isinstance(data, dict):
+        data = [data]
+    if isinstance(data, list) and data:
+        item = data[0]
+        if isinstance(item, dict):
+            return any(k in item for k in ("DOI", "author", "issued", "title", "type"))
+    return False
+
+
+def _is_endnote_xml(path: Path) -> bool:
+    """Heuristic: check if an .xml file looks like EndNote XML."""
+    try:
+        head = path.read_text(encoding="utf-8", errors="replace")[:1000]
+    except OSError:
+        return False
+    return "<records>" in head or "<xml><records>" in head or "endnote" in head.lower()
 
 
 def extract_file(path: Path) -> list[Reference]:
@@ -359,6 +626,12 @@ def extract_file(path: Path) -> list[Reference]:
         return extract_bibtex(path)
     if suffix == ".tex":
         return extract_latex(path)
+    if suffix == ".ris":
+        return extract_ris(path)
+    if suffix == ".xml" and _is_endnote_xml(path):
+        return extract_endnote_xml(path)
+    if suffix == ".json" and _is_csl_json(path):
+        return extract_csl_json(path)
     # Default: Markdown
     return extract_markdown(path)
 
