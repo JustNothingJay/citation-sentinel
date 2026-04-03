@@ -4,7 +4,7 @@ Open-source citation verification for independent researchers.
 
 **citation-sentinel** audits academic papers by extracting references, looking them up on CrossRef and Open Library, validating DOIs, and flagging fabricated or suspicious citations.
 
-Built from real-world audit experience: the SECS (Sovereign Execution and Collapse Substrate) project used this methodology to verify 285 references across 11 papers with zero fabrications detected.
+Built from real-world audit experience: the SECS (Sovereign Execution and Collapse Substrate) project used this methodology to verify citations across 37 DOIs covering 48 papers and all supporting research, with zero fabrications detected.
 
 ---
 
@@ -243,10 +243,7 @@ The `citation_inventory.json` is a structured file with:
 
 ## Accuracy
 
-In the SECS audit (285 references, 11 papers):
-- **208/285** DOIs discovered via CrossRef (73%)
-- **215/215** DOIs validated via doi.org (100% — after paywall classification)
-- **38/50** no-DOI references deep-verified as VERIFIED or LIKELY_REAL (76%)
+In the SECS audit (37 DOIs, 48 papers):
 - **0** suspicious citations (no fabrications)
 
 ### Known Limitations

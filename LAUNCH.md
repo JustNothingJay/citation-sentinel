@@ -12,7 +12,7 @@ The standard just doesn't exist. So I decided to start contributing to one.
 sentinel audit ./my-papers/
 ```
 
-It came out of my own research. I have over 280 citations across papers in the [SECS project](https://secs.observer). I needed to verify every single one of them. I built repetitive repeatable processes, that became repeatable scripts, that became a project. I reverse engineered my own methodology's outputs and turned it into a scalable, usable open source tool. Because nobody asked for it, it also means there is no demand waiting for me to release this, and therefore no hype to attach. Soz.
+It came out of my own research. I have over 280 citations across 37 DOIs covering 48 papers in the [SECS project](https://secs.observer), and all supporting research. I needed to verify every single one of them. I built repetitive repeatable processes, that became repeatable scripts, that became a project. I reverse engineered my own methodology's outputs and turned it into a scalable, usable open source tool. Because nobody asked for it, it also means there is no demand waiting for me to release this, and therefore no hype to attach. Soz.
 
 I am not building because anyone asked me to, but because I do not want my own research being devalued by a lack of awareness of the gaps that I experienced. The methodology that came out of that process is now this tool.
 
