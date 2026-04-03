@@ -4,7 +4,7 @@ Open-source citation verification for independent researchers.
 
 **citation-sentinel** audits academic papers by extracting references, looking them up on CrossRef and Open Library, validating DOIs, and flagging fabricated or suspicious citations.
 
-Built from real-world audit experience: the SECS (Sovereign Engineering Computable Stack) project used this methodology to verify 285 references across 11 papers with zero fabrications detected.
+Built from real-world audit experience: the SECS (Sovereign Execution and Collapse Substrate) project used this methodology to verify 285 references across 11 papers with zero fabrications detected.
 
 ---
 
